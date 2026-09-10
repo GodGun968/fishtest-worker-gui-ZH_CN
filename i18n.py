@@ -25,7 +25,7 @@ LOG_LEVEL_NAMES = {
 
 TRANSLATIONS = {
     "zh_CN": {
-        "app.window_title": "Fishtest Worker 管理器 ({version})",
+        "app.window_title": "Fishtest Worker 管理器 i18n版 ({version})",
         "button.install": "安装/重新安装 Worker",
         "button.update_msys2": "更新 MSYS2 环境",
         "button.settings": "设置",
