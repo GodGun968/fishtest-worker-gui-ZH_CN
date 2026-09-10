@@ -15,7 +15,7 @@ import urllib.request
 from i18n import get_language, language_name, localized_level, set_language, supported_languages, t, translate_worker_output
 
 # --- 常量 ---
-APP_NAME = "Fishtest Worker Manager"
+APP_NAME = "Fishtest Worker Manager I18N"
 APP_VERSION = "v0.0.1"
 REPO_OWNER = "GodGun968"
 REPO_NAME = "fishtest-worker-gui-I18N"

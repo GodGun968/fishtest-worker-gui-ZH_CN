@@ -115,7 +115,7 @@ TRANSLATIONS = {
         "dialog.exit.message": "Worker 仍在运行。要强制停止并退出吗？",
     },
     "en_US": {
-        "app.window_title": "Fishtest Worker Manager ({version})",
+        "app.window_title": "Fishtest Worker Manager I18N ({version})",
         "button.install": "Install/Re-Install Worker",
         "button.update_msys2": "Update MSYS2 Environment",
         "button.settings": "Settings",
