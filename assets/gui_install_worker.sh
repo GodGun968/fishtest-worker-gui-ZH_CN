@@ -1,62 +1,100 @@
 #!/bin/bash
-# NON-INTERACTIVE fishtest worker installer for GUI use
+# 用于图形界面的非交互式 Fishtest Worker 安装脚本
 
-# Arguments from the GUI
+# 图形界面传入的参数
 usr_name="$1"
 usr_pwd="$2"
 n_cores="$3"
+ui_language="${4:-zh_CN}"
 
-echo "--- Starting non-interactive worker installation ---"
-echo "Username: $usr_name"
+if [ "$ui_language" = "en_US" ]; then
+    msg_start="--- Starting non-interactive worker installation ---"
+    msg_username="Username: $usr_name"
+    msg_invalid_cores="Invalid number of cores specified. Defaulting to 1 core."
+    msg_cores="Cores: $n_cores"
+    msg_update="--- Updating system and installing required packages ---"
+    msg_clean="--- Cleaning package cache to save disk space ---"
+    msg_remove="--- Removing old worker directory if it exists ---"
+    msg_download="--- Downloading and extracting fishtest worker ---"
+    msg_venv="--- Setting up Python virtual environment ---"
+    msg_config="--- Generating fishtest.cfg ---"
+    msg_config_ok="Successfully created fishtest.cfg"
+    msg_config_error="Error: Failed to create fishtest.cfg"
+    msg_finalize="--- Finalizing installation ---"
+    msg_complete="--- Installation complete! ---"
+else
+    msg_start="--- 开始非交互式安装 Worker ---"
+    msg_username="用户名：$usr_name"
+    msg_invalid_cores="指定的核心数无效，将默认使用 1 个核心。"
+    msg_cores="核心数：$n_cores"
+    msg_update="--- 正在更新系统并安装必要的软件包 ---"
+    msg_clean="--- 正在清理软件包缓存以节省磁盘空间 ---"
+    msg_remove="--- 正在删除旧的 Worker 文件夹（如存在） ---"
+    msg_download="--- 正在下载并解压 Fishtest Worker ---"
+    msg_venv="--- 正在创建 Python 虚拟环境 ---"
+    msg_config="--- 正在生成 fishtest.cfg ---"
+    msg_config_ok="已成功创建 fishtest.cfg"
+    msg_config_error="错误：创建 fishtest.cfg 失败"
+    msg_finalize="--- 正在完成安装 ---"
+    msg_complete="--- 安装完成！ ---"
+fi
 
-# n_cores should be a positive integer
-# but if we are reinstalling it might contain a string like "2 ; = 2 cores"
-# so we extract the first integer from it
+echo "$msg_start"
+echo "$msg_username"
+
+# n_cores 应为正整数。
+# 重新安装时可能包含类似“2 ; = 2 cores”的字符串，
+# 因此这里只提取其中的第一个整数。
 n_cores=$(echo "$n_cores" | grep -oE '[0-9]+' | head -n 1)
-# if n_cores is empty or not a number, default to 1
+# 如果 n_cores 为空或不是数字，则默认使用 1。
 if ! [[ "$n_cores" =~ ^[0-9]+$ ]]; then
-    echo "Invalid number of cores specified. Defaulting to 1 core."
+    echo "$msg_invalid_cores"
     n_cores=1
 fi
-echo "Cores: $n_cores"
+if [ "$ui_language" = "en_US" ]; then
+    msg_cores="Cores: $n_cores"
+else
+    msg_cores="核心数：$n_cores"
+fi
+echo "$msg_cores"
 
-# 1. Update system and install essential packages
-echo "--- Updating system and installing required packages ---"
+# 1. 更新系统并安装必要的软件包
+echo "$msg_update"
 pacman -Syuu --noconfirm
 pacman -S --noconfirm --needed unzip make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
 
-echo "--- Cleaning package cache to save disk space ---"
+echo "$msg_clean"
 pacman -Scc --noconfirm
 
-# 2. Delete old worker directory to ensure a clean slate
-echo "--- Removing old worker directory if it exists ---"
+# 2. 删除旧的 Worker 文件夹，确保全新安装
+echo "$msg_remove"
 rm -rf worker
 
-# 3. Download and extract the fishtest worker
-echo "--- Downloading and extracting fishtest worker ---"
+# 3. 下载并解压 Fishtest Worker
+echo "$msg_download"
 tmp_dir=___${RANDOM}
 mkdir ${tmp_dir} && pushd ${tmp_dir} > /dev/null
 wget https://github.com/official-stockfish/fishtest/archive/master.zip
-unzip -q master.zip "fishtest-master/worker/**" # -q for quiet
+unzip -q master.zip "fishtest-master/worker/**" # -q 表示安静模式
 pushd fishtest-master/worker > /dev/null
 
-# 4. Setup a virtual environment and install dependencies
-echo "--- Setting up Python virtual environment ---"
+# 4. 创建虚拟环境并安装依赖
+echo "$msg_venv"
 python3 -m venv "env"
 env/bin/python3 -m pip install -q --upgrade pip setuptools wheel
 env/bin/python3 -m pip install -q requests
 
-# 5. Write fishtest.cfg using the worker's own logic
-echo "--- Generating fishtest.cfg ---"
+# 5. 使用 Worker 自身的逻辑写入 fishtest.cfg
+echo "$msg_config"
 env/bin/python3 worker.py "$usr_name" "$usr_pwd" --concurrency "$n_cores" --only_config --no_validation
 if [ $? -eq 0 ]; then
-    echo "Successfully created fishtest.cfg"
+    echo "$msg_config_ok"
 else
-    echo "Error: Failed to create fishtest.cfg"
+    echo "$msg_config_error"
     exit 1
 fi
 
-# 6. Create the fishtest.cmd launcher
+# 6. 创建 fishtest.cmd 启动脚本
 cat << EOF > fishtest.cmd
 @echo off
 set "HERE=%~dp0"
@@ -65,9 +103,9 @@ cd /d "%HERE%"
 env\\bin\\python3.exe worker.py
 EOF
 
-echo "--- Finalizing installation ---"
+echo "$msg_finalize"
 popd > /dev/null && popd > /dev/null
 mv $tmp_dir/fishtest-master/worker .
 rm -rf $tmp_dir
 
-echo "--- Installation complete! ---"
+echo "$msg_complete"
