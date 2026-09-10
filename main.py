@@ -53,6 +53,7 @@ class FishtestManagerApp(ctk.CTk):
         self.task_current_games = 0
         self.task_start_time = None
         self.latest_version_tag = None
+        self.latest_release_url = ""
 
         # 简体中文是默认界面语言。在创建控件前读取已保存的语言，
         # 确保窗口首次显示时就使用正确的语言。
@@ -259,20 +260,22 @@ class FishtestManagerApp(ctk.CTk):
 
     # --- 更新检查逻辑 ---
     def _check_latest_version_thread(self):
-        """在后台线程中检查 GitHub 的最新发布版本。"""
-        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+        """在后台线程中检查 GitHub 的最新发布版本，包含预发行版。"""
+        url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
         try:
-            # 设置 User-Agent，避免触发部分基础过滤
             req = urllib.request.Request(url, headers={'User-Agent': APP_NAME})
-
-            # 设置 5 秒超时，避免网络状况不佳时程序卡住
             with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    latest_tag = data.get("tag_name", "")
-
-                    if latest_tag:
-                        self._compare_versions(latest_tag)
+                if response.status != 200:
+                    return
+                releases = json.loads(response.read().decode())
+                latest = self._pick_latest_release(releases)
+                if latest:
+                    self._compare_versions(
+                        latest.get("tag_name", ""),
+                        latest.get("html_url", ""),
+                    )
+                else:
+                    self.after(0, self.add_log, t("log.update_no_release"), "WARNING")
         except urllib.error.HTTPError as e:
             if e.code == 403:
                 self.after(0, self.add_log, t("log.update_rate_limit"), "WARNING")
@@ -281,30 +284,50 @@ class FishtestManagerApp(ctk.CTk):
         except Exception as e:
             self.after(0, self.add_log, t("log.update_network_failed", error=e), "WARNING")
 
-    def _compare_versions(self, latest_tag):
-        def parse_version(v_str):
-            # 去掉“v”，按“.”拆分并转换为整数
-            try:
-                return tuple(map(int, v_str.lstrip('v').split('.')))
-            except ValueError:
-                return (0, 0, 0)
+    def _pick_latest_release(self, releases):
+        """从 GitHub Releases 中选出最新版本，包含预发行版，排除草稿。"""
+        if not isinstance(releases, list):
+            return None
+        candidates = []
+        for release in releases:
+            if not isinstance(release, dict) or release.get("draft"):
+                continue
+            tag = release.get("tag_name", "")
+            if tag:
+                candidates.append((self._parse_version(tag), tag, release))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return candidates[-1][2]
 
-        current = parse_version(APP_VERSION)
-        latest = parse_version(latest_tag)
+    def _parse_version(self, v_str):
+        try:
+            numeric = v_str.lstrip("v").split("-", 1)[0]
+            return tuple(int(part) for part in numeric.split(".") if part.isdigit())
+        except ValueError:
+            return (0, 0, 0)
+
+    def _compare_versions(self, latest_tag, release_url=""):
+        current = self._parse_version(APP_VERSION)
+        latest = self._parse_version(latest_tag)
 
         if latest > current:
-            self.after(0, lambda: self._show_update_notification(latest_tag))
+            self.after(0, lambda: self._show_update_notification(latest_tag, release_url))
         else:
             self.after(0, self.add_log, t("log.latest_version", version=APP_VERSION))
 
-    def _show_update_notification(self, latest_tag):
+    def _show_update_notification(self, latest_tag, release_url=""):
         self.latest_version_tag = latest_tag
+        self.latest_release_url = release_url
         self.new_version_button.configure(text=t("button.new_version_tag", version=latest_tag))
         self.new_version_button.grid()
         self.add_log(t("log.new_version", version=latest_tag))
 
     def _open_release_page(self):
-        webbrowser.open(f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/latest")
+        webbrowser.open(
+            getattr(self, "latest_release_url", "")
+            or f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases"
+        )
 
     # --- 核心操作 ---
     def _run_with_elevation(self, action_func, action_arg_name):

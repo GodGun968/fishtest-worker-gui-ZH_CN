@@ -1,4 +1,4 @@
-# Fishtest Worker 图形管理器
+# Fishtest Worker 管理器 I18N
 
 这是一个面向 Windows 的图形界面工具，用于安装、配置和运行
 [Fishtest](https://tests.stockfishchess.org/tests) Worker。
@@ -18,7 +18,7 @@
 
 ### 1. 下载
 
-从 [Releases 页面](https://github.com/dav1312/fishtest-worker-gui/releases)下载
+从 [Releases 页面](https://github.com/GodGun968/fishtest-worker-gui-I18N/releases)下载
 `fishtest-worker-gui.exe`。
 
 请将程序放在一个新的空文件夹中，用于管理 Worker。例如：
