@@ -72,13 +72,15 @@
    pip install -r requirements.txt
    ```
 
-4. 使用 PyInstaller 构建可执行文件：
+4. 使用 PyInstaller 构建并压缩可执行文件：
 
    ```sh
-   pyinstaller --name "fishtest-worker-gui" --onefile --noconsole --add-data "assets;assets" main.py
+   set PYTHONOPTIMIZE=2
+   pyinstaller --noconfirm --clean fishtest-worker-gui.spec
+   upx --best --lzma dist/fishtest-worker-gui.exe
    ```
 
-   GitHub Actions 工作流会额外打包 CustomTkinter 文件，并使用 `assets/icon.ico` 设置程序图标。
+   GitHub Actions 会用同一份 spec：去掉重复的 CustomTkinter、排除无用模块，并用 UPX LZMA 压缩最终 exe。
 
 5. 最终的 `.exe` 文件位于 `dist` 文件夹中。
 
