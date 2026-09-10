@@ -3,7 +3,7 @@ name: 构建并发布应用
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '*'
   workflow_dispatch:
 
 jobs:
