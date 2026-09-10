@@ -18,7 +18,7 @@ from i18n import get_language, language_name, localized_level, set_language, sup
 APP_NAME = "Fishtest Worker Manager"
 APP_VERSION = "v0.0.1"
 REPO_OWNER = "GodGun968"
-REPO_NAME = "fishtest-worker-gui-ZH_CN"
+REPO_NAME = "fishtest-worker-gui-I18N"
 
 WORKER_DIR = os.path.abspath("worker")
 CONFIG_FILE_NAME = "fishtest.cfg"
