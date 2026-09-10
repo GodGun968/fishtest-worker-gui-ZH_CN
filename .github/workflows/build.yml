@@ -1,4 +1,4 @@
-name: Build and Release App
+name: 构建并发布应用
 
 on:
   push:
@@ -14,33 +14,33 @@ jobs:
       contents: write
 
     steps:
-    - name: Check out repository
+    - name: 检出仓库
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: 设置 Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: 安装依赖
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Build executable with PyInstaller
+    - name: 使用 PyInstaller 构建可执行文件
       run: |
-        # Find the path to the customtkinter package
+        # 查找 customtkinter 软件包路径
         $ctk_path = python -c "import os, customtkinter; print(os.path.dirname(customtkinter.__file__))"
         echo "CustomTkinter Path: $ctk_path"
         
-        # Run PyInstaller with all the necessary flags
+        # 使用全部必要参数运行 PyInstaller
         pyinstaller --noconsole --onefile --name "fishtest-worker-gui" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
           --add-data "$ctk_path;customtkinter" `
           main.py
 
-    - name: Create GitHub Release and Upload Asset
+    - name: 创建 GitHub Release 并上传构建产物
       uses: softprops/action-gh-release@v2
       with:
         files: dist/*.exe
