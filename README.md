@@ -86,7 +86,7 @@
 
 - 界面文本由根目录的 `i18n.py` 统一管理。
 - 默认语言为简体中文；用户选择的语言会写入 `worker/fishtest.cfg` 的 `[general] language`。
-- Fishtest Worker 的原始输出、命令参数、文件名、配置节名和配置键保持原样，以确保与上游 Worker 和 MSYS2 兼容。
+- 命令参数、文件名、配置节名和配置键保持原样。Worker 原始英文输出仍用于进度解析；简体中文界面会在显示前翻译常见日志。
 - 如果要增加语言，只需在 `i18n.py` 的 `LANGUAGE_NAMES`、`LOG_LEVEL_NAMES` 和 `TRANSLATIONS` 中增加对应语言条目。
 
 ## 许可证

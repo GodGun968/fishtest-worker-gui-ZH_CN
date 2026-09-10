@@ -12,13 +12,13 @@ import re
 import time
 import json
 import urllib.request
-from i18n import get_language, language_name, localized_level, set_language, supported_languages, t
+from i18n import get_language, language_name, localized_level, set_language, supported_languages, t, translate_worker_output
 
 # --- 常量 ---
 APP_NAME = "Fishtest Worker Manager"
-APP_VERSION = "v1.1.1"
-REPO_OWNER = "dav1312"
-REPO_NAME = "fishtest-worker-gui"
+APP_VERSION = "v0.0.1"
+REPO_OWNER = "GodGun968"
+REPO_NAME = "fishtest-worker-gui-ZH_CN"
 
 WORKER_DIR = os.path.abspath("worker")
 CONFIG_FILE_NAME = "fishtest.cfg"
@@ -542,7 +542,8 @@ class FishtestManagerApp(ctk.CTk):
     # --- Worker 进度跟踪 ---
     def _process_worker_output(self, line):
         """解析 Worker 标准输出中的一行，以更新任务进度。"""
-        self.add_log(line, level="WORKER") # Worker 原始输出始终使用 WORKER 标签
+        # 进度解析必须使用原始英文；显示时再翻译。
+        self.add_log(translate_worker_output(line), level="WORKER")
 
         # 检测开始游戏数和总游戏数
         # 格式：Started game X of Y ...
@@ -693,8 +694,12 @@ class FishtestManagerApp(ctk.CTk):
         # 确定标签并格式化日志级别
         level_str = level.upper()
         tag = level_str
-        # 使用固定宽度显示日志级别（7 个字符）
-        padded_level = f"[{localized_level(level):<7}]"
+        
+        # 计算实际显示宽度（中文字符占 2 个宽度，英文/数字占 1 个）
+        localized = localized_level(level)
+        display_width = sum(2 if '\u4e00' <= c <= '\u9fff' else 1 for c in localized)
+        padding = max(0, 7 - display_width)
+        padded_level = f"[{localized}{' ' * padding}]"
 
         # 插入时间戳
         self.log_text.insert(ctk.END, timestamp + " ", "TIMESTAMP")
