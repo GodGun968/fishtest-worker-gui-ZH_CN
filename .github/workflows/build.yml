@@ -34,7 +34,7 @@ jobs:
         echo "CustomTkinter Path: $ctk_path"
         
         # 使用全部必要参数运行 PyInstaller
-        pyinstaller --noconsole --onefile --name "fishtest-worker-gui" `
+        pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
           --add-data "$ctk_path;customtkinter" `
