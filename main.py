@@ -1,22 +1,43 @@
 import customtkinter as ctk
-import tkinter.scrolledtext
-import tkinter.messagebox
 import subprocess
 import threading
 import os
 import sys
 import ctypes
 import configparser
-import webbrowser
-import re
 import time
-import json
-import urllib.request
+
+# 延迟导入，只在需要时导入
+_lazy_imports = {}
+
+def _get_lazy_import(module_name):
+    """延迟导入模块，减少启动时间。"""
+    if module_name not in _lazy_imports:
+        if module_name == 'tkinter.scrolledtext':
+            import tkinter.scrolledtext
+            _lazy_imports[module_name] = tkinter.scrolledtext
+        elif module_name == 'tkinter.messagebox':
+            import tkinter.messagebox
+            _lazy_imports[module_name] = tkinter.messagebox
+        elif module_name == 'webbrowser':
+            import webbrowser
+            _lazy_imports[module_name] = webbrowser
+        elif module_name == 're':
+            import re
+            _lazy_imports[module_name] = re
+        elif module_name == 'json':
+            import json
+            _lazy_imports[module_name] = json
+        elif module_name == 'urllib.request':
+            import urllib.request
+            _lazy_imports[module_name] = urllib.request
+    return _lazy_imports[module_name]
+
 from i18n import get_language, language_name, localized_level, set_language, supported_languages, t, translate_worker_output
 
 # --- 常量 ---
 APP_NAME = "Fishtest Worker Manager I18N"
-APP_VERSION = "v0.0.3"
+APP_VERSION = "v0.0.1" # 会与 tag 自动同步
 REPO_OWNER = "GodGun968"
 REPO_NAME = "fishtest-worker-gui-I18N"
 
@@ -26,6 +47,13 @@ CONFIG_FILE = os.path.join(WORKER_DIR, CONFIG_FILE_NAME)
 EXIT_FILE_NAME = "fish.exit"
 MSYS2_PATH = "C:\\msys64"
 USERNAME_DEFAULT = "your_username"
+
+# 全局配置文件锁，防止并发读写冲突
+_config_lock = threading.Lock()
+
+def escape_bash_single_quote(s):
+    """转义字符串用于 Bash 单引号上下文，防止命令注入。"""
+    return s.replace("'", "'\"'\"'")
 
 def get_asset_path(relative_path):
     """获取资源的绝对路径，兼容开发环境和 PyInstaller 打包环境。"""
@@ -60,11 +88,13 @@ class FishtestManagerApp(ctk.CTk):
         self._load_language()
         self._setup_window()
         self._create_widgets()
-        self._load_config()
+        
+        # 延迟执行非关键初始化，加快窗口显示速度
+        self.after(50, self._load_config)
         self.after(100, self._initial_environment_check)
-        self.after(101, self._update_all_controls_state) # 延迟检查，确保窗口先完成绘制
+        self.after(150, self._update_all_controls_state)
 
-        # 在后台检查更新
+        # 在后台检查更新，延迟启动避免阻塞 UI
         self.after(2000, lambda: threading.Thread(target=self._check_latest_version_thread, daemon=True).start())
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
@@ -143,9 +173,11 @@ class FishtestManagerApp(ctk.CTk):
         log_frame.grid_rowconfigure(0, weight=1)
         log_frame.grid_columnconfigure(0, weight=1)
 
-        self.log_text = tkinter.scrolledtext.ScrolledText(log_frame, wrap=ctk.WORD, state='disabled',
-                                                          bg="#2B2B2B", fg="#DCE4EE", font=("Consolas", 10),
-                                                          relief="flat", borderwidth=0)
+        self.log_text = _get_lazy_import('tkinter.scrolledtext').ScrolledText(
+            log_frame, wrap=ctk.WORD, state='disabled',
+            bg="#2B2B2B", fg="#DCE4EE", font=("Consolas", 10),
+            relief="flat", borderwidth=0
+        )
         self.log_text.grid(row=0, column=0, sticky="nsew")
 
         # --- 日志颜色标签 ---
@@ -160,15 +192,16 @@ class FishtestManagerApp(ctk.CTk):
 
     # --- 配置与状态管理 ---
     def _load_config(self):
-        self.config.read(CONFIG_FILE)
-        if 'login' not in self.config:
-            self.config['login'] = {
-                'username': USERNAME_DEFAULT, 'password': ''
-            }
-        if 'parameters' not in self.config:
-            self.config['parameters'] = {
-                'concurrency': '3'
-            }
+        with _config_lock:
+            self.config.read(CONFIG_FILE)
+            if 'login' not in self.config:
+                self.config['login'] = {
+                    'username': USERNAME_DEFAULT, 'password': ''
+                }
+            if 'parameters' not in self.config:
+                self.config['parameters'] = {
+                    'concurrency': '3'
+                }
         user = self.config.get('login', 'username')
         cores = self.config.get('parameters', 'concurrency')
         self.status_label.configure(text=t("status.idle", user=user, cores=cores))
@@ -188,8 +221,9 @@ class FishtestManagerApp(ctk.CTk):
 
     def _save_config(self):
         try:
-            with open(CONFIG_FILE, 'w') as configfile:
-                self.config.write(configfile)
+            with _config_lock:
+                with open(CONFIG_FILE, 'w') as configfile:
+                    self.config.write(configfile)
             self._load_config()
             self.add_log(t("log.settings_saved", file=CONFIG_FILE_NAME), level="SUCCESS")
             self._handle_github_token()
@@ -263,11 +297,11 @@ class FishtestManagerApp(ctk.CTk):
         """在后台线程中检查 GitHub 的最新发布版本，包含预发行版。"""
         url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases"
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': APP_NAME})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            req = _get_lazy_import('urllib.request').Request(url, headers={'User-Agent': APP_NAME})
+            with _get_lazy_import('urllib.request').urlopen(req, timeout=5) as response:
                 if response.status != 200:
                     return
-                releases = json.loads(response.read().decode())
+                releases = _get_lazy_import('json').loads(response.read().decode())
                 latest = self._pick_latest_release(releases)
                 if latest:
                     self._compare_versions(
@@ -324,7 +358,7 @@ class FishtestManagerApp(ctk.CTk):
         self.add_log(t("log.new_version", version=latest_tag))
 
     def _open_release_page(self):
-        webbrowser.open(
+        _get_lazy_import('webbrowser').open(
             getattr(self, "latest_release_url", "")
             or f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases"
         )
@@ -343,10 +377,10 @@ class FishtestManagerApp(ctk.CTk):
                 ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, params, None, 1)
                 self.destroy()  # 关闭当前非管理员窗口
             except Exception as e:
-                tkinter.messagebox.showerror(t("dialog.elevation_failed.title"), t("dialog.elevation_failed.message", error=e))
+                _get_lazy_import('tkinter.messagebox').showerror(t("dialog.elevation_failed.title"), t("dialog.elevation_failed.message", error=e))
 
     def _run_full_setup(self):
-        if not tkinter.messagebox.askyesno(t("dialog.install.title"), t("dialog.install.message")):
+        if not _get_lazy_import('tkinter.messagebox').askyesno(t("dialog.install.title"), t("dialog.install.message")):
             return
 
         command = f'"{get_asset_path("00_install_winget_msys2_admin.cmd")}"'
@@ -364,12 +398,19 @@ class FishtestManagerApp(ctk.CTk):
 
         # 将安装脚本路径转换为 MSYS2 兼容格式
         msys2_script_path = windows_to_msys2_path(get_asset_path('gui_install_worker.sh'))
-        # 脚本应从应用根目录运行，以创建“worker”子文件夹。
+        # 脚本应从应用根目录运行，以创建"worker"子文件夹。
         app_run_dir = os.path.abspath(".")
 
         # 需要为 Shell 转义参数；脚本路径使用单引号，
         # 以便 Bash 正确处理 MSYS2 路径中的空格。
-        worker_install_cmd = f"bash '{msys2_script_path}' '{user}' '{password}' '{cores}' '{get_language()}'"
+        # 使用 escape_bash_single_quote 防止命令注入。
+        worker_install_cmd = (
+            f"bash '{msys2_script_path}' "
+            f"'{escape_bash_single_quote(user)}' "
+            f"'{escape_bash_single_quote(password)}' "
+            f"'{escape_bash_single_quote(cores)}' "
+            f"'{escape_bash_single_quote(get_language())}'"
+        )
 
         # 使用带引号的 Windows 路径配合 -where，比路径含空格时使用 -here 更安全。
         full_command = f'"{os.path.join(MSYS2_PATH, "msys2_shell.cmd")}" -defterm -ucrt64 -no-start -where "{app_run_dir}" -c "{worker_install_cmd}"'
@@ -399,13 +440,16 @@ class FishtestManagerApp(ctk.CTk):
             self._run_with_elevation(self._uninstall_msys2, 'uninstall_msys2')
 
     def _delete_worker_folder(self):
-        if not tkinter.messagebox.askyesno(t("dialog.delete.title"),
+        if not _get_lazy_import('tkinter.messagebox').askyesno(t("dialog.delete.title"),
                                            t("dialog.delete.message"),
                                            icon='warning'):
             return
 
         worker_dir_abs = os.path.abspath(WORKER_DIR)
-        command = f'chcp 65001 >nul & if exist "{worker_dir_abs}" (echo {t("command.removing_worker")} & rd /s /q "{worker_dir_abs}") else (echo {t("command.worker_not_found")})'
+        # 注意：这里的 t() 翻译文本不应包含特殊字符，已在 i18n.py 中控制
+        removing_msg = t("command.removing_worker")
+        not_found_msg = t("command.worker_not_found")
+        command = f'chcp 65001 >nul & if exist "{worker_dir_abs}" (echo {removing_msg} & rd /s /q "{worker_dir_abs}") else (echo {not_found_msg})'
 
         self._run_command_in_thread(
             command,
@@ -414,13 +458,16 @@ class FishtestManagerApp(ctk.CTk):
         )
 
     def _uninstall_msys2(self):
-        if not tkinter.messagebox.askyesno(t("dialog.uninstall.title"),
+        if not _get_lazy_import('tkinter.messagebox').askyesno(t("dialog.uninstall.title"),
                                            t("dialog.uninstall.message"),
                                            icon='warning'):
             return
 
         msys2_uninstaller = os.path.join(MSYS2_PATH, "uninstall.exe")
-        command = f'chcp 65001 >nul & if exist "{msys2_uninstaller}" (echo {t("command.uninstalling_msys2")} & start /wait "" "{msys2_uninstaller}" /S) else (echo {t("command.msys2_not_found")})'
+        # 注意：这里的 t() 翻译文本不应包含特殊字符，已在 i18n.py 中控制
+        uninstalling_msg = t("command.uninstalling_msys2")
+        not_found_msg = t("command.msys2_not_found")
+        command = f'chcp 65001 >nul & if exist "{msys2_uninstaller}" (echo {uninstalling_msg} & start /wait "" "{msys2_uninstaller}" /S) else (echo {not_found_msg})'
 
         self._run_command_in_thread(
             command,
@@ -524,7 +571,7 @@ class FishtestManagerApp(ctk.CTk):
     def _force_stop_worker_event(self, event):
         # 检查对象是否存在，而不是依赖 Windows 对进程运行状态的判断。
         if self.worker_process is not None:
-            if tkinter.messagebox.askyesno(t("dialog.force_stop.title"), t("dialog.force_stop.message")):
+            if _get_lazy_import('tkinter.messagebox').askyesno(t("dialog.force_stop.title"), t("dialog.force_stop.message")):
                 self._stop_worker_forcefully()
 
     def _stop_worker_forcefully(self):
@@ -570,7 +617,7 @@ class FishtestManagerApp(ctk.CTk):
 
         # 检测开始游戏数和总游戏数
         # 格式：Started game X of Y ...
-        match_start = re.search(r"^Started game (\d+) of (\d+)", line)
+        match_start = _get_lazy_import('re').search(r"^Started game (\d+) of (\d+)", line)
         if match_start:
             game_num = int(match_start.group(1))
             total_games = int(match_start.group(2))
@@ -588,7 +635,7 @@ class FishtestManagerApp(ctk.CTk):
 
         # 检测任务进度
         # 格式：Games: N, Wins: ...
-        match_progress = re.search(r"^Games: (\d+), Wins:", line)
+        match_progress = _get_lazy_import('re').search(r"^Games: (\d+), Wins:", line)
         if match_progress:
             self.task_current_games = int(match_progress.group(1))
             self._update_progress_display()
@@ -704,7 +751,7 @@ class FishtestManagerApp(ctk.CTk):
 
         register_label = ctk.CTkLabel(win, text=t("settings.register"), fg_color="transparent", text_color="#33a2ff", cursor="hand2")
         register_label.pack(pady=(0, 0))
-        register_label.bind("<Button-1>", lambda e: webbrowser.open("https://tests.stockfishchess.org/signup"))
+        register_label.bind("<Button-1>", lambda e: _get_lazy_import('webbrowser').open("https://tests.stockfishchess.org/signup"))
 
     def add_log(self, message, level="INFO"):
         # 检查用户是否正在查看历史记录（已向上滚动）
@@ -717,7 +764,7 @@ class FishtestManagerApp(ctk.CTk):
         # 确定标签并格式化日志级别
         level_str = level.upper()
         tag = level_str
-        
+
         # 计算实际显示宽度（中文字符占 2 个宽度，英文/数字占 1 个）
         localized = localized_level(level)
         display_width = sum(2 if '\u4e00' <= c <= '\u9fff' else 1 for c in localized)
@@ -742,7 +789,7 @@ class FishtestManagerApp(ctk.CTk):
 
     def _on_closing(self):
         if self.worker_process and self.worker_process.poll() is None:
-            if tkinter.messagebox.askyesno(t("dialog.exit.title"), t("dialog.exit.message")):
+            if _get_lazy_import('tkinter.messagebox').askyesno(t("dialog.exit.title"), t("dialog.exit.message")):
                 self._stop_worker_forcefully()
                 self.destroy()
         else:
