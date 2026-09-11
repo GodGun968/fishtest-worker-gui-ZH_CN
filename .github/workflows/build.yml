@@ -32,29 +32,29 @@ jobs:
         # 查找 customtkinter 软件包路径
         $ctk_path = python -c "import os, customtkinter; print(os.path.dirname(customtkinter.__file__))"
         echo "CustomTkinter Path: $ctk_path"
-        
+
         # 下载并安装 UPX（用于压缩可执行文件）
         echo "下载 UPX..."
         Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip" -OutFile "upx.zip"
         Expand-Archive -Path "upx.zip" -DestinationPath "."
         $upx_path = Resolve-Path "upx-*-win64\upx.exe"
         echo "UPX 路径: $upx_path"
-        
+
         # 使用全部必要参数运行 PyInstaller
-        # --strip: 去除调试符号
         # --upx-dir: 指定 UPX 路径用于压缩
+        # --upx-exclude: 不压缩 Python DLL，否则 Windows 可能无法加载
         # --optimize=2: Python 字节码优化级别 2（移除断言和文档字符串）
-        pyinstaller --noconsole --onefile --name "fishtest-worker-gui" `
+        pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
           --add-data "$ctk_path;customtkinter" `
-          --strip `
           --upx-dir="$(Split-Path $upx_path)" `
+          --upx-exclude="python311.dll" `
           --optimize=2 `
           main.py
-        
+
         # 显示压缩后的文件大小
-        $exe = Get-Item "dist\fishtest-worker-gui.exe"
+        $exe = Get-Item "dist\fishtest-worker-gui-i18n.exe"
         echo "最终 EXE 大小: $([math]::Round($exe.Length / 1MB, 2)) MB"
 
     - name: 创建 GitHub Release 并上传构建产物
@@ -69,5 +69,5 @@ jobs:
       if: github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v4
       with:
-        name: fishtest-worker-gui
+        name: fishtest-worker-gui-i18n
         path: dist/*.exe
