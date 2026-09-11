@@ -51,12 +51,26 @@ jobs:
         # PyInstaller 的 onefile 内置压缩已启用。
         # 不使用 UPX，避免启动时解压 Python/Tk 运行库导致启动变慢。
         # --optimize=2：优化 Python 字节码，减少体积且不影响运行时性能。
+        # --exclude-module：排除不需要的标准库模块，减少 2-4 MB。
         pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
           --add-data "$ctk_path;customtkinter" `
           --noupx `
           --optimize=2 `
+          --exclude-module PIL `
+          --exclude-module numpy `
+          --exclude-module pandas `
+          --exclude-module matplotlib `
+          --exclude-module PyQt5 `
+          --exclude-module PyQt6 `
+          --exclude-module PySide2 `
+          --exclude-module PySide6 `
+          --exclude-module email `
+          --exclude-module xml.etree `
+          --exclude-module unittest `
+          --exclude-module pydoc `
+          --exclude-module doctest `
           main.py
 
         # 显示压缩后的文件大小
