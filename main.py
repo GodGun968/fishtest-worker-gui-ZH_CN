@@ -64,11 +64,24 @@ def get_asset_path(relative_path):
     return os.path.join(base_path, "assets", relative_path)
 
 def windows_to_msys2_path(path):
+    """将 Windows 路径转换为 MSYS2 路径格式。
+    
+    注意：MSYS2 对非 ASCII 字符（如中文）的支持有限，
+    建议使用纯英文路径以避免潜在问题。
+    """
     # 将 C:\Users\... 转换为 /c/Users/...
     drive, rest = os.path.splitdrive(os.path.abspath(path))
     drive_letter = drive.rstrip(":\\/").lower()
     rest = rest.replace("\\", "/").lstrip("/\\")
     return f"/{drive_letter}/{rest}"
+
+def check_path_ascii(path):
+    """检查路径是否仅包含 ASCII 字符。"""
+    try:
+        path.encode('ascii')
+        return True
+    except UnicodeEncodeError:
+        return False
 
 class FishtestManagerApp(ctk.CTk):
     def __init__(self):
@@ -234,6 +247,11 @@ class FishtestManagerApp(ctk.CTk):
 
     def _initial_environment_check(self):
         """记录初始环境状态，不改变界面控件。"""
+        # 检查当前工作目录是否包含非 ASCII 字符
+        current_dir = os.path.abspath(".")
+        if not check_path_ascii(current_dir):
+            self.add_log(t("log.non_ascii_path_warning", path=current_dir), level="WARNING")
+        
         msys2_installed = os.path.exists(os.path.join(MSYS2_PATH, "msys2_shell.cmd"))
         worker_installed = os.path.exists(os.path.join(WORKER_DIR, "worker.py"))
 
