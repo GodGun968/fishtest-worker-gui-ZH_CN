@@ -33,23 +33,15 @@ jobs:
         $ctk_path = python -c "import os, customtkinter; print(os.path.dirname(customtkinter.__file__))"
         echo "CustomTkinter Path: $ctk_path"
 
-        # 下载并安装 UPX（用于压缩可执行文件）
-        echo "下载 UPX..."
-        Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip" -OutFile "upx.zip"
-        Expand-Archive -Path "upx.zip" -DestinationPath "."
-        $upx_path = Resolve-Path "upx-*-win64\upx.exe"
-        echo "UPX 路径: $upx_path"
-
         # 使用全部必要参数运行 PyInstaller
-        # --upx-dir: 指定 UPX 路径用于压缩
-        # --upx-exclude: 不压缩 Python DLL，否则 Windows 可能无法加载
-        # --optimize=2: Python 字节码优化级别 2（移除断言和文档字符串）
+        # PyInstaller 的 onefile 内置压缩已启用。
+        # 不使用 UPX，避免启动时解压 Python/Tk 运行库导致启动变慢。
+        # --optimize=2：优化 Python 字节码，减少体积且不影响运行时性能。
         pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
           --add-data "$ctk_path;customtkinter" `
-          --upx-dir="$(Split-Path $upx_path)" `
-          --upx-exclude="python311.dll" `
+          --noupx `
           --optimize=2 `
           main.py
 
