@@ -27,6 +27,20 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: 同步版本号到代码
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        # 从 Git tag 提取版本号（如 refs/tags/v0.0.1 -> v0.0.1）
+        $tag = "${{ github.ref }}" -replace 'refs/tags/', ''
+        echo "检测到标签: $tag"
+        
+        # 读取 main.py 并替换 APP_VERSION
+        $main = Get-Content -Path "main.py" -Raw -Encoding UTF8
+        $main = $main -replace 'APP_VERSION = "v[0-9]+\.[0-9]+\.[0-9]+"', "APP_VERSION = `"$tag`""
+        [System.IO.File]::WriteAllText("$PWD\main.py", $main, [System.Text.UTF8Encoding]::new($false))
+        
+        echo "版本号已同步为: $tag"
+
     - name: 使用 PyInstaller 构建可执行文件
       run: |
         # 查找 customtkinter 软件包路径
