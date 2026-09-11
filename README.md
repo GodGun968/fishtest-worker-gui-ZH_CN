@@ -6,7 +6,8 @@
 它会自动安装 MSYS2、下载 Fishtest Worker 文件、管理 Worker 配置，并在界面中实时显示日志和任务进度。
 程序首次运行默认使用简体中文，也可以在“设置”窗口中切换为 English。
 
-![app](https://github.com/user-attachments/assets/bc10707b-2349-430b-99a4-cd88761dd851)
+<img width="1354" height="1022" alt="image" src="https://github.com/user-attachments/assets/50ed42c4-758a-4024-ac95-dc3b92b43441" />
+
 
 ## 系统要求
 
