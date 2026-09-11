@@ -15,10 +15,10 @@ jobs:
 
     steps:
     - name: 检出仓库
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
     - name: 设置 Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -27,30 +27,39 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: 安装 UPX
-      shell: pwsh
-      run: |
-        $upxVersion = "5.0.2"
-        $url = "https://github.com/upx/upx/releases/download/v$upxVersion/upx-$upxVersion-win64.zip"
-        $zip = Join-Path $env:RUNNER_TEMP "upx.zip"
-        $dest = Join-Path $env:RUNNER_TEMP "upx"
-        Invoke-WebRequest -Uri $url -OutFile $zip
-        Expand-Archive -Path $zip -DestinationPath $dest -Force
-        $upxDir = Get-ChildItem $dest -Directory | Select-Object -First 1
-        echo "$($upxDir.FullName)" >> $env:GITHUB_PATH
-
     - name: 使用 PyInstaller 构建可执行文件
-      env:
-        PYTHONOPTIMIZE: "2"
       run: |
-        pyinstaller --noconfirm --clean fishtest-worker-gui.spec
-        $exe = "dist/fishtest-worker-gui.exe"
-        if (-not (Test-Path $exe)) { throw "未生成 $exe" }
-        python tools/pack_exe.py $exe
+        # 查找 customtkinter 软件包路径
+        $ctk_path = python -c "import os, customtkinter; print(os.path.dirname(customtkinter.__file__))"
+        echo "CustomTkinter Path: $ctk_path"
+        
+        # 下载并安装 UPX（用于压缩可执行文件）
+        echo "下载 UPX..."
+        Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip" -OutFile "upx.zip"
+        Expand-Archive -Path "upx.zip" -DestinationPath "."
+        $upx_path = Resolve-Path "upx-*-win64\upx.exe"
+        echo "UPX 路径: $upx_path"
+        
+        # 使用全部必要参数运行 PyInstaller
+        # --strip: 去除调试符号
+        # --upx-dir: 指定 UPX 路径用于压缩
+        # --optimize=2: Python 字节码优化级别 2（移除断言和文档字符串）
+        pyinstaller --noconsole --onefile --name "fishtest-worker-gui" `
+          --icon="assets/icon.ico" `
+          --add-data "assets;assets" `
+          --add-data "$ctk_path;customtkinter" `
+          --strip `
+          --upx-dir="$(Split-Path $upx_path)" `
+          --optimize=2 `
+          main.py
+        
+        # 显示压缩后的文件大小
+        $exe = Get-Item "dist\fishtest-worker-gui.exe"
+        echo "最终 EXE 大小: $([math]::Round($exe.Length / 1MB, 2)) MB"
 
     - name: 创建 GitHub Release 并上传构建产物
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v2
       with:
         files: dist/*.exe
       env:
@@ -58,7 +67,7 @@ jobs:
 
     - name: 上传构建产物（仅用于测试）
       if: github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v4
       with:
         name: fishtest-worker-gui
         path: dist/*.exe
