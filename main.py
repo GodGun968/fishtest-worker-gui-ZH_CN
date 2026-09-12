@@ -31,6 +31,9 @@ def _get_lazy_import(module_name):
         elif module_name == 'urllib.request':
             import urllib.request
             _lazy_imports[module_name] = urllib.request
+        elif module_name == 'urllib.error':
+            import urllib.error
+            _lazy_imports[module_name] = urllib.error
     return _lazy_imports[module_name]
 
 from i18n import get_language, language_name, localized_level, set_language, supported_languages, t, translate_worker_output
@@ -103,14 +106,19 @@ class FishtestManagerApp(ctk.CTk):
         self._create_widgets()
         
         # 延迟执行非关键初始化，加快窗口显示速度
-        self.after(50, self._load_config)
-        self.after(100, self._initial_environment_check)
-        self.after(150, self._update_all_controls_state)
+        # 注意：_initial_environment_check 依赖 config，必须在 _load_config 之后
+        self.after(50, self._delayed_init)
 
         # 在后台检查更新，延迟启动避免阻塞 UI
         self.after(2000, lambda: threading.Thread(target=self._check_latest_version_thread, daemon=True).start())
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+    
+    def _delayed_init(self):
+        """延迟初始化，确保按正确顺序执行依赖操作。"""
+        self._load_config()
+        self._initial_environment_check()
+        self._update_all_controls_state()
 
     def _is_admin(self):
         try:
@@ -328,7 +336,7 @@ class FishtestManagerApp(ctk.CTk):
                     )
                 else:
                     self.after(0, self.add_log, t("log.update_no_release"), "WARNING")
-        except urllib.error.HTTPError as e:
+        except _get_lazy_import('urllib.error').HTTPError as e:
             if e.code == 403:
                 self.after(0, self.add_log, t("log.update_rate_limit"), "WARNING")
             else:
@@ -706,6 +714,7 @@ class FishtestManagerApp(ctk.CTk):
                 )
                 for line in iter(process.stdout.readline, ''):
                     self.after(0, self.add_log, line.strip(), "CMD")
+                process.stdout.close()
                 rc = process.wait()
                 if end_message: self.after(0, self.add_log, end_message)
                 if rc == 0:
