@@ -95,7 +95,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 上传构建产物（仅用于测试）
+    - name: 上传构建产物（手动触发时）
       if: github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v7
       with:
