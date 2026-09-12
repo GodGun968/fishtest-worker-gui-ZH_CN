@@ -2,10 +2,29 @@
 # 用于图形界面的非交互式 Fishtest Worker 安装脚本
 
 # 图形界面传入的参数
-usr_name="$1"
-usr_pwd="$2"
-n_cores="$3"
-ui_language="${4:-zh_CN}"
+if [ "$1" = "--encoded" ]; then
+    decode_arg() {
+        printf '%s' "$1" | base64 --decode
+    }
+
+    usr_name="$(decode_arg "$2")"
+    usr_pwd="$(decode_arg "$3")"
+    n_cores="$(decode_arg "$4")"
+    ui_language="$(decode_arg "$5")"
+    if [ -z "$usr_name" ] || [ -z "$ui_language" ]; then
+        if [ "$ui_language" = "en_US" ]; then
+            echo "Error: Failed to decode installation arguments."
+        else
+            echo "错误：无法解码图形界面传入的安装参数。"
+        fi
+        exit 2
+    fi
+else
+    usr_name="$1"
+    usr_pwd="$2"
+    n_cores="$3"
+    ui_language="${4:-zh_CN}"
+fi
 
 if [ "$ui_language" = "en_US" ]; then
     msg_start="--- Starting non-interactive worker installation ---"
