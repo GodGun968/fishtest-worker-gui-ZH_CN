@@ -15,10 +15,10 @@ jobs:
 
     steps:
     - name: 检出仓库
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: 设置 Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: '3.11'
 
@@ -29,16 +29,21 @@ jobs:
 
     - name: 同步版本号到代码
       if: startsWith(github.ref, 'refs/tags/')
+      env:
+        RELEASE_TAG: ${{ github.ref_name }}
       run: |
-        # 从 Git tag 提取版本号（如 refs/tags/v0.0.1 -> v0.0.1）
-        $tag = "${{ github.ref }}" -replace 'refs/tags/', ''
+        # 通过环境变量读取并校验 Git tag，避免将 tag 直接插入 PowerShell 代码。
+        $tag = $env:RELEASE_TAG
+        if ($tag -notmatch '^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+          throw "无效的版本标签: $tag"
+        }
         echo "检测到标签: $tag"
-        
+
         # 读取 main.py 并替换 APP_VERSION
         $main = Get-Content -Path "main.py" -Raw -Encoding UTF8
         $main = $main -replace 'APP_VERSION = "v[0-9]+\.[0-9]+\.[0-9]+"', "APP_VERSION = `"$tag`""
         [System.IO.File]::WriteAllText("$PWD\main.py", $main, [System.Text.UTF8Encoding]::new($false))
-        
+
         echo "版本号已同步为: $tag"
 
     - name: 使用 PyInstaller 构建可执行文件
@@ -51,7 +56,8 @@ jobs:
         # PyInstaller 的 onefile 内置压缩已启用。
         # 不使用 UPX，避免启动时解压 Python/Tk 运行库导致启动变慢。
         # --optimize=2：优化 Python 字节码，减少体积且不影响运行时性能。
-        # --exclude-module：排除不需要的标准库模块，减少 2-4 MB。
+        # --exclude-module：排除不需要的标准库模块，减少体积。
+        # 注意：email 模块被 urllib 依赖，不能排除。
         pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
@@ -66,8 +72,6 @@ jobs:
           --exclude-module PyQt6 `
           --exclude-module PySide2 `
           --exclude-module PySide6 `
-          --exclude-module email `
-          --exclude-module xml.etree `
           --exclude-module unittest `
           --exclude-module pydoc `
           --exclude-module doctest `
@@ -77,9 +81,20 @@ jobs:
         $exe = Get-Item "dist\fishtest-worker-gui-i18n.exe"
         echo "最终 EXE 大小: $([math]::Round($exe.Length / 1MB, 2)) MB"
 
+        # 验证打包后的程序能启动并自动退出。
+        $env:CI_SMOKE_TEST = "1"
+        $process = Start-Process -FilePath $exe.FullName -PassThru -WindowStyle Hidden
+        if (-not $process.WaitForExit(15000)) {
+          Stop-Process -Id $process.Id -Force
+          throw "EXE 启动检查超时"
+        }
+        if ($process.ExitCode -ne 0) {
+          throw "EXE 启动检查失败，退出代码: $($process.ExitCode)"
+        }
+
     - name: 创建 GitHub Release 并上传构建产物
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: dist/*.exe
       env:
@@ -87,7 +102,7 @@ jobs:
 
     - name: 上传构建产物（仅用于测试）
       if: github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: fishtest-worker-gui-i18n
         path: dist/*.exe
