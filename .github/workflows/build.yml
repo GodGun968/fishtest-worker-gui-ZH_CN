@@ -48,10 +48,6 @@ jobs:
 
     - name: 使用 PyInstaller 构建可执行文件
       run: |
-        # 查找 customtkinter 软件包路径
-        $ctk_path = python -c "import os, customtkinter; print(os.path.dirname(customtkinter.__file__))"
-        echo "CustomTkinter Path: $ctk_path"
-
         # 使用全部必要参数运行 PyInstaller
         # PyInstaller 的 onefile 内置压缩已启用。
         # 不使用 UPX，避免启动时解压 Python/Tk 运行库导致启动变慢。
@@ -61,7 +57,6 @@ jobs:
         pyinstaller --noconsole --onefile --name "fishtest-worker-gui-i18n" `
           --icon="assets/icon.ico" `
           --add-data "assets;assets" `
-          --add-data "$ctk_path;customtkinter" `
           --noupx `
           --optimize=2 `
           --exclude-module PIL `
